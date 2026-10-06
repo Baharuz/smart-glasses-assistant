@@ -1,0 +1,1 @@
+"""Türkçe çevresel algılama prototipi."""
