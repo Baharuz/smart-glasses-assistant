@@ -28,11 +28,16 @@ Kamera penceresi seçiliyken:
 | Tuş | İşlem |
 | --- | --- |
 | Boşluk | Bir kareyi Gemini'ye gönder ve Türkçe açıklamayı oku |
+| S | Konuşmayı durdur; analiz sürüyorsa sonucunu yalnızca terminalde göster |
 | R | Son başarılı açıklamayı yeniden oku; API isteği göndermez |
 | Q / Esc | Kamerayı kapat ve çık |
 
-Analiz veya sesli okuma sürerken yeni istek kabul edilmez. Çıkışta devam eden
-işlem tamamlanana kadar süreç açık kalabilir; ağ zaman aşımı 30 saniyedir.
+Sesli okuma sırasında Boşluk ile yeni tarama başlatabilir, R ile son açıklamayı
+yeniden okuyabilirsin. Analiz sürerken ikinci API isteği başlatılmaz. S tuşu
+API isteğini iptal etmez; o taramanın sesli yanıtını susturur. Yeni taramada
+ses yeniden açılır. Hazır, analiz ve hata durumları sesli bildirilir.
+Çıkışta ses hemen durdurulur; devam eden ağ isteği tamamlanana kadar süreç
+açık kalabilir. Ağ zaman aşımı 30 saniyedir.
 
 ## Kamera ve ses ayarları
 
@@ -62,7 +67,10 @@ API anahtarı ve kamera olmadan servis testleri:
 ```
 
 Gerçek cihaz kontrolü: uygulamayı aç, Boşluk ile bir sahneyi tara, ses/terminal
-açıklamasını kontrol et, R ile tekrarla ve Q ile kapat. Kamera ve Türkçe ses
+açıklamasını kontrol et. Konuşurken S ile durdur, R ile tekrar oku.
+Konuşurken Boşluk ile yeniden tara. Analiz sırasında S’ye basıp yanıtın
+yalnızca terminale geldiğini kontrol et. Yeni taramada sesin geri geldiğini
+doğrula. Konuşurken Q ile kapatıp sesin kesildiğini kontrol et. Kamera ve Türkçe ses
 donanım üzerinde ayrıca denenmelidir.
 
 ## Sonraki adımlar
