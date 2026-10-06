@@ -1,11 +1,13 @@
 """Çalıştırma: python -m smart_glasses"""
 
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .vision import GeminiVision, VisionError
 from .speech import Speaker
+from .microphone import Recorder, MicrophoneError
 
 
 def main():
@@ -32,13 +34,24 @@ def main():
         speaker.stop()
         return 1
 
+    recorder = Recorder()
+    last_m_press = 0.0
     executor = ThreadPoolExecutor(max_workers=1)
     task = None
     last_description = ""
 
     read_result = True
-    print("Kamera penceresi seçiliyken: BOŞLUK = tara, S = sesi durdur, R = tekrar oku, Q/ESC = çıkış.")
-    speaker.say("Hazır. Boşluk tuşuyla çevreni tarayabilirsin. S tuşuyla sesi durdurabilirsin.")
+    print("Kamera penceresi seçiliyken: BOŞLUK = tara, M = konuş/gönder, S = durdur/iptal, R = tekrar oku, Q/ESC = çıkış.")
+    speaker.say("Hazır. Boşluk tuşuyla çevreni tarayabilirsin. M tuşuna bas, konuş ve tekrar M ile gönder. S tuşuyla sesi durdurabilirsin.")
+    def encode_frame(frame):
+        height, width = frame.shape[:2]
+        if width > 1280:
+            frame = cv2.resize(frame, (1280, round(height * 1280 / width)))
+        encoded, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not encoded:
+            raise MicrophoneError("Görüntü kodlanamadı. Tekrar dene.")
+        return buffer.tobytes()
+
     window = "Smart Glasses Assistant"
     try:
         cv2.namedWindow(window)
@@ -69,32 +82,60 @@ def main():
                 speaker.wait()
                 return 1
             display = frame.copy()
-            label = "Analyzing... | S: mute" if task else ("Speaking... | S: stop | SPACE: scan" if speaker.speaking else "SPACE: scan | R: repeat | S: stop | Q: quit")
+            if recorder.recording:
+                label = "Listening... | M: send | S: cancel (max 20s)"
+            elif task:
+                label = "Thinking... | S: mute"
+            elif speaker.speaking:
+                label = "Speaking... | M: talk | S: stop"
+            else:
+                label = "M: talk | SPACE: scan | R: repeat | S: stop | Q: quit"
             cv2.putText(display, label, (12, 30), cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (0, 255, 255), 2)
             cv2.imshow(window, display)
             key = cv2.waitKey(20) & 0xFF
             if key in (27, ord("q"), ord("Q")) or cv2.getWindowProperty(window, cv2.WND_PROP_VISIBLE) < 1:
                 break
-            if key in (ord("s"), ord("S")):
+            auto_send = (recorder.recording and recorder.full.is_set()
+                         and key not in (ord("s"), ord("S")))
+            if auto_send or (key in (ord("m"), ord("M")) and time.monotonic() - last_m_press > 0.6):
+                last_m_press = time.monotonic()
+                if task is not None:
+                    continue
+                try:
+                    if recorder.recording:
+                        wav = recorder.finish()
+                        jpeg = encode_frame(frame)
+                        read_result = True
+                        speaker.say("Sorunu yanıtlıyorum.")
+                        task = executor.submit(vision.answer_audio, wav, jpeg)
+                    else:
+                        speaker.stop()
+                        recorder.start()
+                        # Kayıt sırasında sesli bildirim çalınmaz; modele karışmasın.
+                        print("Dinliyorum. Konuş; M ile gönder, S ile iptal et.", flush=True)
+                except MicrophoneError as exc:
+                    speaker.say(str(exc))
+            elif key in (ord("s"), ord("S")):
                 speaker.stop()
+                recorder.cancel()
                 read_result = False
                 print("Ses durduruldu.", flush=True)
-            elif key == 32 and task is None:
-                # Analiz kareleri üstündeki arayüz yazıları modele gönderilmez.
-                height, width = frame.shape[:2]
-                if width > 1280:
-                    frame = cv2.resize(frame, (1280, round(height * 1280 / width)))
-                encoded, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                if encoded:
+            elif key == 32 and task is None and not recorder.recording:
+                try:
+                    jpeg = encode_frame(frame)
                     read_result = True
                     speaker.say("Görüntü analiz ediliyor.")
-                    task = executor.submit(vision.describe, buffer.tobytes())
-                else:
-                    speaker.say("Görüntü kodlanamadı. Tekrar dene.")
-            elif key in (ord("r"), ord("R")) and task is None:
-                speaker.say(last_description or "Henüz bir tarama yapılmadı.")
+                    task = executor.submit(vision.describe, jpeg)
+                except MicrophoneError as exc:
+                    speaker.say(str(exc))
+            elif key in (ord("r"), ord("R")) and task is None and not recorder.recording:
+                speaker.say(last_description or "Henüz bir yanıt alınmadı.")
+            elif key in (ord("c"), ord("C")) and task is None and not recorder.recording:
+                vision.history.clear()
+                speaker.say("Sohbet geçmişi temizlendi.")
     finally:
+        recorder.cancel()
         speaker.stop()
         camera.release()
         cv2.destroyAllWindows()

@@ -28,7 +28,9 @@ Kamera penceresi seçiliyken:
 | Tuş | İşlem |
 | --- | --- |
 | Boşluk | Bir kareyi Gemini'ye gönder ve Türkçe açıklamayı oku |
-| S | Konuşmayı durdur; analiz sürüyorsa sonucunu yalnızca terminalde göster |
+| M | Mikrofonu aç; konuşmayı bitirince tekrar M ile gönder (en fazla 20 saniye) |
+| C | Son altı soru-cevaptan oluşan sohbet geçmişini temizle |
+| S | Konuşmayı durdur veya mikrofon kaydını iptal et; analiz sürüyorsa sonucunu yalnızca terminalde göster |
 | R | Son başarılı açıklamayı yeniden oku; API isteği göndermez |
 | Q / Esc | Kamerayı kapat ve çık |
 
@@ -50,8 +52,12 @@ açık kalabilir. Ağ zaman aşımı 30 saniyedir.
 
 ## Veri akışı ve sınırlar
 
-Kamera önizlemesi yereldir. Yalnızca Boşluk tuşuyla seçilen kare bulut API'sine
-gönderilir. Fotoğraflar uygulama tarafından diske kaydedilmez. Açıklama terminalde
+Kamera önizlemesi yereldir. Boşluk ile seçilen kare bulut API'sine gönderilir.
+M ile gönderilen soruda ses kaydı ve gönderim anındaki kamera karesi Gemini'ye
+birlikte gönderilir; genel sorular da bu akışı kullanır. Mikrofon yalnızca M
+ile açılır; S ile iptal edilen kayıt gönderilmez. Ses kaydı diske yazılmaz.
+Son altı soru-cevap metni bellekte tutulup takip sorularında yeniden gönderilir;
+C tuşuyla temizlenir, uygulama kapanınca silinir. Fotoğraflar uygulama tarafından diske kaydedilmez. Açıklama terminalde
 gösterilir ve tekrar okuma için bellekte tutulur. İsteklerde `store=false` kullanılır;
 bu ayar sağlayıcının genel veri işleme koşullarının yerine geçmez.
 
@@ -75,9 +81,23 @@ donanım üzerinde ayrıca denenmelidir.
 
 ## Sonraki adımlar
 
-1. Mikrofonla soru sorma ve görüntüye göre yanıt verme.
+1. Ayrı yazı okuma modu.
 2. Bekleme modunda yerel görüntü değişikliği algılama.
 3. Mobil istemci ve gözlük kamerası bağlantısı.
 
 API uygulaması [Gemini görüntü anlama](https://ai.google.dev/gemini-api/docs/image-understanding)
 ve [Interactions API](https://ai.google.dev/api/interactions-api) belgelerini temel alır.
+
+## Sesli sohbeti deneme
+
+Güncellemeden sonra `python -m pip install -r requirements.txt` çalıştır.
+Kamera penceresinde M'ye bir kez bas, konuş ve tekrar M'ye basarak gönder.
+Mikrofon açılırken mevcut konuşma kesilir; kayıt sırasında asistan konuşmaz.
+20 saniyede kayıt otomatik gönderilir. S kaydı iptal eder.
+
+“Masada ne var?” ardından “Rengi ne?” ile görsel takip sorularını;
+“Bugün Python çalışmak istiyorum, nereden başlayayım?” ile genel sohbeti dene.
+Yanıtı S ile kes, R ile yeniden dinle. C ile konuşma geçmişini temizle.
+Windows Ayarlar → Gizlilik ve güvenlik → Mikrofon bölümünde masaüstü
+uygulamalarına erişim izni gerekebilir. Gerçek mikrofon, Türkçe ses ve API
+uyumluluğu cihazda ayrıca denenmelidir; otomatik testler servisi taklit eder.
